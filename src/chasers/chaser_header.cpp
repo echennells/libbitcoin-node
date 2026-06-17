@@ -117,10 +117,9 @@ code chaser_header::validate(const header& header,
 // Storable methods (private).
 // ----------------------------------------------------------------------------
 
-bool chaser_header::is_storable(const chain_state& state) const NOEXCEPT
+bool chaser_header::is_storable(const chain_state&) const NOEXCEPT
 {
-    return is_checkpoint(state) || is_milestone(state)
-        || (is_current(state) && is_hard(state));
+    return true;
 }
 
 bool chaser_header::is_checkpoint(const chain_state& state) const NOEXCEPT
