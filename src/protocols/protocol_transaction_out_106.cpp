@@ -150,9 +150,9 @@ bool protocol_transaction_out_106::handle_receive_get_data(const code& ec,
     if (stopped(ec))
         return false;
 
-    // Send and desubscribe.
+    // Send.
     send_transaction(error::success, zero, message);
-    return false;
+    return true;
 }
 
 // Outbound (tx).
@@ -175,13 +175,9 @@ void protocol_transaction_out_106::send_transaction(const code& ec,
         if (message->items.at(index).is_transaction_type())
             break;
 
-    // BUGBUG: registration race.
+    // Complete.
     if (index >= message->items.size())
-    {
-        // Complete, resubscribe to transaction requests.
-        SUBSCRIBE_CHANNEL(get_data, handle_receive_get_data, _1, _2);
         return;
-    }
 
     const auto& item = message->items.at(index);
     const auto witness = item.is_witness_type();
