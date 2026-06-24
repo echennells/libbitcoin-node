@@ -222,7 +222,7 @@ bool protocol_filter_out_70015::handle_receive_get_filters(const code& ec,
 
     span<milliseconds>(events::ancestry_msecs, start);
     send_filter(error::success, ancestry);
-    return false;
+    return true;
 }
 
 void protocol_filter_out_70015::send_filter(const code& ec,
@@ -234,8 +234,7 @@ void protocol_filter_out_70015::send_filter(const code& ec,
 
     if (ancestry->empty())
     {
-        // Complete, resubscribe to get_client_filters.
-        SUBSCRIBE_CHANNEL(get_client_filters, handle_receive_get_filters, _1, _2);
+        // Complete.
         return;
     }
 
