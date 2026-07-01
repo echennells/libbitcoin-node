@@ -109,6 +109,7 @@ test_libbitcoin_node_test_SOURCES = \
     test/chasers/chaser_template.cpp \
     test/chasers/chaser_transaction.cpp \
     test/chasers/chaser_validate.cpp \
+    test/messages/block.cpp \
     test/protocols/protocol.cpp \
     test/sessions/session.cpp
 
