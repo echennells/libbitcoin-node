@@ -150,8 +150,10 @@ bool protocol_transaction_out_106::handle_receive_get_data(const code& ec,
     if (stopped(ec))
         return false;
 
-    // Send and desubscribe.
-    send_transaction(error::success, zero, message);
+    // Post send and desubscribe. Posting prevents a synchronous completion
+    // (a get_data with no transaction items) from resubscribing re-entrantly
+    // within the channel subscriber notification.
+    POST(send_transaction, error::success, zero, message);
     return false;
 }
 
@@ -175,7 +177,6 @@ void protocol_transaction_out_106::send_transaction(const code& ec,
         if (message->items.at(index).is_transaction_type())
             break;
 
-    // BUGBUG: registration race.
     if (index >= message->items.size())
     {
         // Complete, resubscribe to transaction requests.

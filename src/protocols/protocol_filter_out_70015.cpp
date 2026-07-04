@@ -220,8 +220,11 @@ bool protocol_filter_out_70015::handle_receive_get_filters(const code& ec,
         return false;
     }
 
+    // Post send and desubscribe. Posting prevents a synchronous completion
+    // (an empty ancestry) from resubscribing re-entrantly within the channel
+    // subscriber notification.
     span<milliseconds>(events::ancestry_msecs, start);
-    send_filter(error::success, ancestry);
+    POST(send_filter, error::success, ancestry);
     return false;
 }
 
