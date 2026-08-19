@@ -116,7 +116,7 @@ BOOST_AUTO_TEST_CASE(error_t__code__suspended_channel__true_expected_message)
     const auto ec = code(value);
     BOOST_REQUIRE(ec);
     BOOST_REQUIRE(ec == value);
-    BOOST_REQUIRE_EQUAL(ec.message(), "sacrificed channel");
+    BOOST_REQUIRE_EQUAL(ec.message(), "suspended channel");
 }
 
 BOOST_AUTO_TEST_CASE(error_t__code__suspended_service__true_expected_message)
@@ -125,7 +125,7 @@ BOOST_AUTO_TEST_CASE(error_t__code__suspended_service__true_expected_message)
     const auto ec = code(value);
     BOOST_REQUIRE(ec);
     BOOST_REQUIRE(ec == value);
-    BOOST_REQUIRE_EQUAL(ec.message(), "sacrificed service");
+    BOOST_REQUIRE_EQUAL(ec.message(), "suspended service");
 }
 
 // blockchain
