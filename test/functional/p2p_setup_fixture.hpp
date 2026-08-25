@@ -55,7 +55,8 @@ struct p2p_setup_fixture
 
     /// Perform the version handshake, retains the node's version message.
     bool handshake(uint64_t services=0,
-        uint32_t version=network::messages::peer::level::maximum_protocol);
+        uint32_t version=network::messages::peer::level::maximum_protocol,
+        bool relay=false);
 
     /// The node's version message (set by handshake).
     network::messages::peer::version::cptr node_version{};

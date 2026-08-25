@@ -134,7 +134,8 @@ data_chunk p2p_setup_fixture::receive(const std::string& command)
     }
 }
 
-bool p2p_setup_fixture::handshake(uint64_t services, uint32_t value)
+bool p2p_setup_fixture::handshake(uint64_t services, uint32_t value,
+    bool relay)
 {
     version out{};
     out.value = value;
@@ -143,7 +144,7 @@ bool p2p_setup_fixture::handshake(uint64_t services, uint32_t value)
     out.nonce = 42424242;
     out.user_agent = "/test/";
     out.start_height = 0;
-    out.relay = false;
+    out.relay = relay;
     send(out, value);
 
     // The node sends its version upon attach and verack upon our version.
