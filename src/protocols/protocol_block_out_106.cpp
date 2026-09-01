@@ -205,7 +205,9 @@ void protocol_block_out_106::send_block(const code& ec) NOEXCEPT
         return;
 
     if (backlog_.empty()) return;
-    const auto& item = backlog_.front();
+
+    // Copied because the item is answered after the backlog is popped.
+    const auto item = backlog_.front();
     const auto witness = item.is_witness_type();
     if (witness && !node_witness_)
     {
@@ -216,11 +218,26 @@ void protocol_block_out_106::send_block(const code& ec) NOEXCEPT
 
     const auto& query = archive();
     const auto link = query.to_header(item.hash);
+
+    // A hash that resolves to no header is ordinary peer input, and the
+    // checkpoint height query faults the store on a terminal link.
+    if (link.is_terminal())
+    {
+        LOGR("Requested block " << encode_hash(item.hash) << " from ["
+            << opposite() << "] not stored.");
+
+        backlog_.pop_front();
+        handle_unservable(item);
+        return;
+    }
+
     if (node_pruned_ && (is_under_checkpoint(link) || query.is_milestone(link)))
     {
         LOGR("Requested pruned block " << encode_hash(item.hash)
             << " from [" << opposite() << "].");
-        stop(system::error::not_found);
+
+        backlog_.pop_front();
+        handle_unservable(item);
         return;
     }
 
@@ -235,14 +252,21 @@ void protocol_block_out_106::send_block(const code& ec) NOEXCEPT
             << opposite() << "] not found.");
 
         // This block could not have been advertised to the peer.
-        // TODO: send not_found message in protocol override.
-        stop(system::error::not_found);
+        backlog_.pop_front();
+        handle_unservable(item);
         return;
     }
 
     backlog_.pop_front();
     span<microseconds>(events::block_usecs, start);
     SEND(std::move(out), send_block, _1);
+}
+
+// not_found is undefined below bip37, so the channel is stopped instead.
+void protocol_block_out_106::handle_unservable(const inventory_item&) NOEXCEPT
+{
+    BC_ASSERT(stranded());
+    stop(system::error::not_found);
 }
 
 // utilities

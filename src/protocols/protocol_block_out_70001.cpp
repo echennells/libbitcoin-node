@@ -16,60 +16,36 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <bitcoin/node/protocols/protocol_block_out_70012.hpp>
+#include <bitcoin/node/protocols/protocol_block_out_70001.hpp>
 
 #include <bitcoin/node/define.hpp>
 
 namespace libbitcoin {
 namespace node {
 
-#define CLASS protocol_block_out_70012
+#define CLASS protocol_block_out_70001
 
-using namespace system;
-using namespace network;
 using namespace network::messages::peer;
 using namespace std::placeholders;
 
-BC_PUSH_WARNING(SMART_PTR_NOT_NEEDED)
-BC_PUSH_WARNING(NO_VALUE_OR_CONST_REF_SHARED_PTR)
-
-// Start.
+// Inbound (get_data).
 // ----------------------------------------------------------------------------
 
-void protocol_block_out_70012::start() NOEXCEPT
+// The item is answered and the send loop resumed, as with a block, so nothing
+// is produced until the prior write completes.
+void protocol_block_out_70001::handle_unservable(
+    const inventory_item& item) NOEXCEPT
 {
     BC_ASSERT(stranded());
 
-    if (started())
+    if (!enable_not_found_)
+    {
+        protocol_block_out_106::handle_unservable(item);
         return;
+    }
 
-    SUBSCRIBE_CHANNEL(send_headers, handle_receive_send_headers, _1, _2);
-    protocol_block_out_70001::start();
+    SEND(not_found{ { item } }, send_block, _1);
 }
-
-// Inbound (send_headers).
-// ----------------------------------------------------------------------------
-
-bool protocol_block_out_70012::handle_receive_send_headers(const code& ec,
-    const send_headers::cptr&) NOEXCEPT
-{
-    BC_ASSERT(stranded());
-
-    if (stopped(ec))
-        return false;
-
-    superseded_ = true;
-    return false;
-}
-
-// Suspends inventory announcement processing in favor of header announcements.
-bool protocol_block_out_70012::superseded() const NOEXCEPT
-{
-    return superseded_;
-}
-
-BC_POP_WARNING()
-BC_POP_WARNING()
 
 } // namespace node
 } // namespace libbitcoin

@@ -203,11 +203,19 @@ void protocol_transaction_out_106::send_transaction(const code& ec,
             << " from [" << opposite() << "] not found.");
 
         // This tx could not have been advertised to the peer.
-        stop(system::error::not_found);
+        handle_unservable(item, index, message);
         return;
     }
 
     SEND(transaction{ ptr }, send_transaction, _1, add1(index), message);
+}
+
+// not_found is undefined below bip37, so the channel is stopped instead.
+void protocol_transaction_out_106::handle_unservable(const inventory_item&,
+    size_t, const get_data::cptr&) NOEXCEPT
+{
+    BC_ASSERT(stranded());
+    stop(system::error::not_found);
 }
 
 BC_POP_WARNING()

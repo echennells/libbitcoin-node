@@ -58,4 +58,73 @@ BOOST_AUTO_TEST_CASE(functional_p2p__get_data__genesis_block__expected_bytes)
     BOOST_REQUIRE(payload == expected);
 }
 
+BOOST_AUTO_TEST_CASE(functional_p2p__get_data__unknown_block__not_found)
+{
+    BOOST_REQUIRE(handshake());
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+}
+
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__pruned_block__not_found,
+    p2p_limited_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const system::chain::block& genesis = config_.bitcoin.genesis_block;
+    const get_data get{ { { inventory_item::type_id::block, genesis.hash() } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+}
+
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unassociated_block__not_found,
+    p2p_unassociated_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const auto hash = unassociated().hash();
+    const get_data get{ { { inventory_item::type_id::block, hash } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == hash);
+}
+
+// not_found is undefined below bip37, so the channel is stopped instead.
+BOOST_AUTO_TEST_CASE(functional_p2p__get_data__unknown_block_106__stopped)
+{
+    BOOST_REQUIRE(handshake(0, level::bip35));
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, level::bip35);
+
+    // The channel is stopped, so the socket closes without a not_found.
+    BOOST_REQUIRE_THROW(receive(not_found::command), boost::system::system_error);
+}
+
+// The option is disabled, so the channel is stopped instead.
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_block_disabled__stopped,
+    p2p_not_found_disabled_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, node_version->value);
+
+    BOOST_REQUIRE_THROW(receive(not_found::command), boost::system::system_error);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

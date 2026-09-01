@@ -72,4 +72,47 @@ private:
     boost::asio::ip::tcp::socket socket_{ io_ };
 };
 
+// A node that does not store the blocks it has pruned.
+struct p2p_limited_setup_fixture
+  : p2p_setup_fixture
+{
+    inline p2p_limited_setup_fixture()
+      : p2p_setup_fixture({}, [](configuration& config)
+        {
+            config.node.limited_blocks = true;
+        })
+    {
+    }
+};
+
+// A header is archived before its block is associated, so the header link
+// resolves while the block remains absent from the archive. This is the
+// steady state of headers-first synchronization.
+struct p2p_unassociated_setup_fixture
+  : p2p_setup_fixture
+{
+    static system::chain::header unassociated() NOEXCEPT;
+
+    inline p2p_unassociated_setup_fixture()
+      : p2p_setup_fixture([](node::query& query)
+        {
+            return query.set(unassociated(), database::context{}, false);
+        })
+    {
+    }
+};
+
+// A node configured not to send not_found stops the channel instead.
+struct p2p_not_found_disabled_setup_fixture
+  : p2p_setup_fixture
+{
+    inline p2p_not_found_disabled_setup_fixture()
+      : p2p_setup_fixture({}, [](configuration& config)
+        {
+            config.network.enable_not_found = false;
+        })
+    {
+    }
+};
+
 #endif

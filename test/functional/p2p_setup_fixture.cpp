@@ -50,6 +50,7 @@ p2p_setup_fixture::p2p_setup_fixture(const initializer& setup,
     network_settings.outbound.connections = 0;
     network_settings.outbound.seeds.clear();
     node_settings.delay_inbound = false;
+    network_settings.enable_not_found = true;
 
     // Apply test-specific configuration overrides.
     if (configure)
@@ -168,6 +169,20 @@ bool p2p_setup_fixture::handshake(uint64_t services, uint32_t value)
 
     send(version_acknowledge{}, value);
     return true;
+}
+
+system::chain::header p2p_unassociated_setup_fixture::unassociated() NOEXCEPT
+{
+    const system::settings bitcoin{ chain::selection::mainnet };
+    return
+    {
+        1u,
+        bitcoin.genesis_block.hash(),
+        system::null_hash,
+        0u,
+        0u,
+        0u
+    };
 }
 
 BC_POP_WARNING()
