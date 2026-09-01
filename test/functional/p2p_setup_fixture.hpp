@@ -55,7 +55,8 @@ struct p2p_setup_fixture
 
     /// Perform the version handshake, retains the node's version message.
     bool handshake(uint64_t services=0,
-        uint32_t version=network::messages::peer::level::maximum_protocol);
+        uint32_t version=network::messages::peer::level::maximum_protocol,
+        bool relay=false);
 
     /// The node's version message (set by handshake).
     network::messages::peer::version::cptr node_version{};
@@ -70,6 +71,67 @@ protected:
 private:
     boost::asio::io_context io_{};
     boost::asio::ip::tcp::socket socket_{ io_ };
+};
+
+// A node configured to reply not_found.
+struct p2p_not_found_setup_fixture
+  : p2p_setup_fixture
+{
+    inline p2p_not_found_setup_fixture()
+      : p2p_setup_fixture({}, [](configuration& config)
+        {
+            config.network.enable_not_found = true;
+        })
+    {
+    }
+};
+
+// A node that relays transactions and replies not_found.
+struct p2p_relay_setup_fixture
+  : p2p_setup_fixture
+{
+    inline p2p_relay_setup_fixture()
+      : p2p_setup_fixture({}, [](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.network.enable_not_found = true;
+        })
+    {
+    }
+};
+
+// A node that does not store the blocks it has pruned.
+struct p2p_limited_setup_fixture
+  : p2p_setup_fixture
+{
+    inline p2p_limited_setup_fixture()
+      : p2p_setup_fixture({}, [](configuration& config)
+        {
+            config.node.limited_blocks = true;
+            config.network.enable_not_found = true;
+        })
+    {
+    }
+};
+
+// A header is archived before its block is associated, so the header link
+// resolves while the block remains absent from the archive. This is the
+// steady state of headers-first synchronization.
+struct p2p_unassociated_setup_fixture
+  : p2p_setup_fixture
+{
+    static system::chain::header unassociated() NOEXCEPT;
+
+    inline p2p_unassociated_setup_fixture()
+      : p2p_setup_fixture([](node::query& query)
+        {
+            return query.set(unassociated(), database::context{}, false);
+        }, [](configuration& config)
+        {
+            config.network.enable_not_found = true;
+        })
+    {
+    }
 };
 
 #endif
