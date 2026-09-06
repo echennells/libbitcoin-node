@@ -30,7 +30,7 @@ BOOST_AUTO_TEST_CASE(settings__node__default_context__expected)
     using namespace network;
 
     const node::settings node{};
-    BOOST_REQUIRE_EQUAL(node.threads, 1_u32);
+    BOOST_REQUIRE_EQUAL(node.threads, 0_u32);
     BOOST_REQUIRE_EQUAL(node.delay_inbound, true);
     BOOST_REQUIRE_EQUAL(node.headers_first, true);
     BOOST_REQUIRE_EQUAL(node.memory_priority, true);
@@ -61,7 +61,7 @@ BOOST_AUTO_TEST_CASE(settings__node__default_context__expected)
     ////BOOST_REQUIRE_EQUAL(node.snapshot_valid, 250'000_u32);
     ////BOOST_REQUIRE_EQUAL(node.snapshot_confirm, 500'000_u32);
 
-    BOOST_REQUIRE_EQUAL(node.threads_(), one);
+    BOOST_REQUIRE_EQUAL(node.threads_(), cores());
     BOOST_REQUIRE_EQUAL(node.maximum_height_(), max_size_t);
     BOOST_REQUIRE_EQUAL(node.maximum_concurrency_(), 50'000_size);
     BOOST_REQUIRE_EQUAL(node.fee_estimate_horizon_(), 0_size);
