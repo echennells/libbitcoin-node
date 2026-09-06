@@ -29,7 +29,7 @@ namespace libbitcoin {
 namespace node {
 
 settings::settings() NOEXCEPT
-  : threads{ 1 },
+  : threads{ 0 },
     delay_inbound{ true },
     headers_first{ true },
     memory_priority{ true },
@@ -68,7 +68,8 @@ settings::settings(chain::selection) NOEXCEPT
 
 size_t settings::threads_() const NOEXCEPT
 {
-    return std::max<size_t>(threads, one);
+    // Zero implies hardware threads (including hyperthreads).
+    return to_bool(threads) ? threads : network::cores();
 }
 
 size_t settings::maximum_height_() const NOEXCEPT
