@@ -16,42 +16,43 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef LIBBITCOIN_NODE_PROTOCOLS_PROTOCOL_BLOCK_OUT_70012_HPP
-#define LIBBITCOIN_NODE_PROTOCOLS_PROTOCOL_BLOCK_OUT_70012_HPP
+#ifndef LIBBITCOIN_NODE_PROTOCOLS_PROTOCOL_BLOCK_OUT_70001_HPP
+#define LIBBITCOIN_NODE_PROTOCOLS_PROTOCOL_BLOCK_OUT_70001_HPP
 
 #include <bitcoin/node/define.hpp>
-#include <bitcoin/node/protocols/protocol_block_out_70001.hpp>
+#include <bitcoin/node/protocols/protocol_block_out_106.hpp>
 
 namespace libbitcoin {
 namespace node {
     
-class BCN_API protocol_block_out_70012
-  : public protocol_block_out_70001,
-    protected network::tracker<protocol_block_out_70012>
+class BCN_API protocol_block_out_70001
+  : public protocol_block_out_106,
+    protected network::tracker<protocol_block_out_70001>
 {
 public:
-    typedef std::shared_ptr<protocol_block_out_70012> ptr;
+    typedef std::shared_ptr<protocol_block_out_70001> ptr;
 
-    protocol_block_out_70012(const auto& session,
+    protocol_block_out_70001(const auto& session,
         const network::channel::ptr& channel) NOEXCEPT
-      : protocol_block_out_70001(session, channel),
-        network::tracker<protocol_block_out_70012>(session->log)
+      : protocol_block_out_106(session, channel),
+        enable_not_found_(session->network_settings().enable_not_found),
+        network::tracker<protocol_block_out_70001>(session->log)
     {
     }
 
-    /// Start protocol (strand required).
-    void start() NOEXCEPT override;
-
 protected:
-    /// Block announcements are superseded by send_headers.
-    bool superseded() const NOEXCEPT override;
+    /// The item cannot be served, accumulates it for the not_found reply.
+    bool handle_unservable(const inventory_item& item) NOEXCEPT override;
 
-    virtual bool handle_receive_send_headers(const code& ec,
-        const network::messages::peer::send_headers::cptr& message) NOEXCEPT;
+    /// Replies not_found with the accumulated items, false if none.
+    bool report_unservable() NOEXCEPT override;
 
 private:
     // This is thread safe.
-    std::atomic_bool superseded_{};
+    const bool enable_not_found_;
+
+    // This is protected by strand.
+    inventory_items unservable_{};
 };
 
 } // namespace node

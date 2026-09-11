@@ -107,8 +107,7 @@ inline void CLASS::attach_protocols(const channel_ptr& channel) NOEXCEPT
         return;
 
     // Ready to relay transactions.
-    const auto txs_in_out = relay && peer->is_negotiated(level::bip37) &&
-        (!delay || is_current_chain(true));
+    const auto txs_in_out = relay && (!delay || is_current_chain(true));
 
     // Peer advertises chain (blocks in).
     if (peer->is_peer_service(service::node_network))
@@ -140,21 +139,24 @@ inline void CLASS::attach_protocols(const channel_ptr& channel) NOEXCEPT
             channel->attach<protocol_header_out_70012>(self)->start();
             channel->attach<protocol_block_out_70012>(self)->start();
         }
-        else if (headers && peer->is_negotiated(level::headers_protocol))
-        {
-            channel->attach<protocol_header_out_31800>(self)->start();
-            channel->attach<protocol_block_out_106>(self)->start();
-        }
         else
         {
-            channel->attach<protocol_block_out_106>(self)->start();
+            if (headers && peer->is_negotiated(level::headers_protocol))
+                channel->attach<protocol_header_out_31800>(self)->start();
+
+            if (peer->is_negotiated(level::bip37))
+                channel->attach<protocol_block_out_70001>(self)->start();
+            else
+                channel->attach<protocol_block_out_106>(self)->start();
         }
     }
 
     // Relay is configured, active, and txs are ready (txs in/out).
-    if (txs_in_out)
+    if (txs_in_out && peer->peer_version()->relay)
     {
-        if (peer->peer_version()->relay)
+        if (peer->is_negotiated(level::bip37))
+            channel->attach<protocol_transaction_out_70001>(self)->start();
+        else
             channel->attach<protocol_transaction_out_106>(self)->start();
     }
 }

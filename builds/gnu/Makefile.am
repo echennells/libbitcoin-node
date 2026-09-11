@@ -77,6 +77,7 @@ src_libbitcoin_node_la_SOURCES = \
     ${srcdir}/../../src/protocols/protocol_block_in_106.cpp \
     ${srcdir}/../../src/protocols/protocol_block_in_31800.cpp \
     ${srcdir}/../../src/protocols/protocol_block_out_106.cpp \
+    ${srcdir}/../../src/protocols/protocol_block_out_70001.cpp \
     ${srcdir}/../../src/protocols/protocol_block_out_70012.cpp \
     ${srcdir}/../../src/protocols/protocol_filter_out_70015.cpp \
     ${srcdir}/../../src/protocols/protocol_header_in_31800.cpp \
@@ -88,6 +89,7 @@ src_libbitcoin_node_la_SOURCES = \
     ${srcdir}/../../src/protocols/protocol_performer.cpp \
     ${srcdir}/../../src/protocols/protocol_transaction_in_106.cpp \
     ${srcdir}/../../src/protocols/protocol_transaction_out_106.cpp \
+    ${srcdir}/../../src/protocols/protocol_transaction_out_70001.cpp \
     ${srcdir}/../../src/sessions/session.cpp \
     ${srcdir}/../../src/sessions/session_inbound.cpp \
     ${srcdir}/../../src/sessions/session_manual.cpp \
@@ -162,6 +164,7 @@ include_bitcoin_node_protocols_HEADERS = \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_block_in_106.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_block_in_31800.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_block_out_106.hpp \
+    ${srcdir}/../../include/bitcoin/node/protocols/protocol_block_out_70001.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_block_out_70012.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_filter_out_70015.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_header_in_31800.hpp \
@@ -173,6 +176,7 @@ include_bitcoin_node_protocols_HEADERS = \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_performer.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_transaction_in_106.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocol_transaction_out_106.hpp \
+    ${srcdir}/../../include/bitcoin/node/protocols/protocol_transaction_out_70001.hpp \
     ${srcdir}/../../include/bitcoin/node/protocols/protocols.hpp
 
 include_bitcoin_node_sessionsdir = \

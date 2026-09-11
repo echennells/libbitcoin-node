@@ -16,56 +16,54 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <bitcoin/node/protocols/protocol_block_out_70012.hpp>
+#include <bitcoin/node/protocols/protocol_block_out_70001.hpp>
 
 #include <bitcoin/node/define.hpp>
 
 namespace libbitcoin {
 namespace node {
 
-#define CLASS protocol_block_out_70012
+#define CLASS protocol_block_out_70001
 
 using namespace system;
 using namespace network;
 using namespace network::messages::peer;
 using namespace std::placeholders;
 
+// Shared pointers required for lifetime in handler parameters.
 BC_PUSH_WARNING(SMART_PTR_NOT_NEEDED)
 BC_PUSH_WARNING(NO_VALUE_OR_CONST_REF_SHARED_PTR)
 
-// Start.
+// Outbound (not_found).
 // ----------------------------------------------------------------------------
 
-void protocol_block_out_70012::start() NOEXCEPT
+// Accumulate the run, so that it is reported by one message.
+bool protocol_block_out_70001::handle_unservable(
+    const inventory_item& item) NOEXCEPT
 {
     BC_ASSERT(stranded());
 
-    if (started())
-        return;
+    if (!enable_not_found_)
+        return protocol_block_out_106::handle_unservable(item);
 
-    SUBSCRIBE_CHANNEL(send_headers, handle_receive_send_headers, _1, _2);
-    protocol_block_out_70001::start();
+    unservable_.push_back(item);
+    return true;
 }
 
-// Inbound (send_headers).
-// ----------------------------------------------------------------------------
-
-bool protocol_block_out_70012::handle_receive_send_headers(const code& ec,
-    const send_headers::cptr&) NOEXCEPT
+// The items are answered and the send loop resumed, as with a block, so
+// nothing is produced until the prior write completes.
+bool protocol_block_out_70001::report_unservable() NOEXCEPT
 {
     BC_ASSERT(stranded());
 
-    if (stopped(ec))
+    if (unservable_.empty())
         return false;
 
-    superseded_ = true;
-    return false;
-}
+    auto items = std::move(unservable_);
+    unservable_.clear();
 
-// Suspends inventory announcement processing in favor of header announcements.
-bool protocol_block_out_70012::superseded() const NOEXCEPT
-{
-    return superseded_;
+    SEND(not_found{ std::move(items) }, send_block, _1);
+    return true;
 }
 
 BC_POP_WARNING()

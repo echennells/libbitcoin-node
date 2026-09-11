@@ -204,45 +204,114 @@ void protocol_block_out_106::send_block(const code& ec) NOEXCEPT
     if (stopped(ec))
         return;
 
-    if (backlog_.empty()) return;
-    const auto& item = backlog_.front();
-    const auto witness = item.is_witness_type();
-    if (witness && !node_witness_)
-    {
-        LOGR("Unsupported witness get_data from [" << opposite() << "].");
-        stop(network::error::protocol_violation);
-        return;
-    }
-
     const auto& query = archive();
-    const auto link = query.to_header(item.hash);
-    if (node_pruned_ && (is_under_checkpoint(link) || query.is_milestone(link)))
+
+    // Drain unservable items from the front of the backlog. The derived
+    // protocol accumulates them if it reports them, and otherwise stops the
+    // channel on the first. Copied because each is handled after the pop.
+    database::header_link link{};
+    while (!backlog_.empty())
     {
-        LOGR("Requested pruned block " << encode_hash(item.hash)
-            << " from [" << opposite() << "].");
-        stop(system::error::not_found);
-        return;
+        const auto item = backlog_.front();
+        if (item.is_witness_type() && !node_witness_)
+        {
+            LOGR("Unsupported witness get_data from [" << opposite() << "].");
+            stop(network::error::protocol_violation);
+            return;
+        }
+
+        link = query.to_header(item.hash);
+        if (is_servable(item, link))
+            break;
+
+        backlog_.pop_front();
+        if (!handle_unservable(item))
+            return;
     }
 
+    // The report resumes this loop on completion, so it precedes the block.
+    if (report_unservable())
+        return;
+
+    if (backlog_.empty()) return;
+
+    const auto item = backlog_.front();
+    const auto witness = item.is_witness_type();
     const auto start = logger::now();
     messages::peer::block out
     {
         { query.get_wire_block(link, witness), witness }
     };
+
+    // Association is verified above, so this is not ordinary peer input.
     if (!out.block.is_valid())
     {
-        LOGR("Requested block " << encode_hash(item.hash) << " from ["
-            << opposite() << "] not found.");
+        LOGV("Requested block " << encode_hash(item.hash) << " from ["
+            << opposite() << "] not obtained.");
 
-        // This block could not have been advertised to the peer.
-        // TODO: send not_found message in protocol override.
-        stop(system::error::not_found);
+        backlog_.pop_front();
+        if (handle_unservable(item))
+            report_unservable();
+
         return;
     }
 
     backlog_.pop_front();
     span<microseconds>(events::block_usecs, start);
     SEND(std::move(out), send_block, _1);
+}
+
+// The checkpoint, milestone and association queries assume an archived header.
+bool protocol_block_out_106::is_servable(const inventory_item& LOG_ONLY(item),
+    const database::header_link& link) NOEXCEPT
+{
+    BC_ASSERT(stranded());
+
+    // A hash that resolves to no header is ordinary peer input.
+    if (link.is_terminal())
+    {
+        LOGV("Requested block " << encode_hash(item.hash) << " from ["
+            << opposite() << "] not stored.");
+        return false;
+    }
+
+    const auto& query = archive();
+    if (node_pruned_ && (is_under_checkpoint(link) || query.is_milestone(link)))
+    {
+        LOGV("Requested pruned block " << encode_hash(item.hash)
+            << " from [" << opposite() << "].");
+        return false;
+    }
+
+    // This block could not have been advertised to the peer.
+    if (!query.is_associated(link))
+    {
+        LOGV("Requested block " << encode_hash(item.hash) << " from ["
+            << opposite() << "] not found.");
+        return false;
+    }
+
+    return true;
+}
+
+// not_found is undefined below bip37, so the channel is stopped instead.
+bool protocol_block_out_106::handle_unservable(
+    const inventory_item& LOG_ONLY(item)) NOEXCEPT
+{
+    BC_ASSERT(stranded());
+
+    LOGR("Unservable block " << encode_hash(item.hash) << " from ["
+        << opposite() << "], stopping.");
+
+    stop(system::error::not_found);
+    return false;
+}
+
+// There is nothing to report below bip37, the channel is stopped above.
+bool protocol_block_out_106::report_unservable() NOEXCEPT
+{
+    BC_ASSERT(stranded());
+    return false;
 }
 
 // utilities

@@ -63,6 +63,11 @@ protected:
     virtual void send_transaction(const code& ec, size_t index,
         const network::messages::peer::get_data::cptr& message) NOEXCEPT;
 
+    /// The requested item cannot be served, stops the channel.
+    virtual void handle_unservable(
+        const network::messages::peer::inventory_item& item, size_t index,
+        const network::messages::peer::get_data::cptr& message) NOEXCEPT;
+
     virtual bool announce(const system::hash_digest& hash) NOEXCEPT;
 
 private:

@@ -58,4 +58,154 @@ BOOST_AUTO_TEST_CASE(functional_p2p__get_data__genesis_block__expected_bytes)
     BOOST_REQUIRE(payload == expected);
 }
 
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_block__not_found,
+    p2p_not_found_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+}
+
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__pruned_block__not_found,
+    p2p_limited_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const system::chain::block& genesis = config_.bitcoin.genesis_block;
+    const get_data get{ { { inventory_item::type_id::block, genesis.hash() } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+}
+
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unassociated_block__not_found,
+    p2p_unassociated_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const auto hash = unassociated().hash();
+    const get_data get{ { { inventory_item::type_id::block, hash } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == hash);
+}
+
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_transaction__not_found,
+    p2p_relay_setup_fixture)
+{
+    BOOST_REQUIRE(handshake(0, level::maximum_protocol, true));
+
+    const get_data get{ { { inventory_item::type_id::transaction, system::one_hash } } };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+}
+
+// Below bip130 the 70001 protocol is attached directly (not as 70012 base).
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_block_70001__not_found,
+    p2p_not_found_setup_fixture)
+{
+    BOOST_REQUIRE(handshake(0, level::bip61));
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, level::bip61);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(level::bip61, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+}
+
+// A run of unservable items is answered by one message.
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_blocks__one_not_found,
+    p2p_not_found_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const get_data get
+    {
+        {
+            { inventory_item::type_id::block, system::one_hash },
+            { inventory_item::type_id::block, system::null_hash }
+        }
+    };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), two);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+    BOOST_REQUIRE(message->items.back().hash == system::null_hash);
+}
+
+// The unservable run is flushed before the send loop resumes.
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_then_genesis__not_found_then_block,
+    p2p_not_found_setup_fixture)
+{
+    BOOST_REQUIRE(handshake());
+
+    const system::chain::block& genesis = config_.bitcoin.genesis_block;
+    const get_data get
+    {
+        {
+            { inventory_item::type_id::block, system::one_hash },
+            { inventory_item::type_id::block, genesis.hash() }
+        }
+    };
+    send(get, node_version->value);
+
+    const auto payload = receive(not_found::command);
+    const auto message = not_found::deserialize(node_version->value, payload);
+    BOOST_REQUIRE(message);
+    BOOST_REQUIRE_EQUAL(message->items.size(), one);
+    BOOST_REQUIRE(message->items.front().hash == system::one_hash);
+
+    // The send loop resumes and serves the item that follows the run.
+    BOOST_REQUIRE_EQUAL(receive(block::command).size(), genesis.to_data(true).size());
+}
+
+// not_found is undefined below bip37, so the channel is stopped instead.
+BOOST_FIXTURE_TEST_CASE(functional_p2p__get_data__unknown_block_106__stopped,
+    p2p_not_found_setup_fixture)
+{
+    BOOST_REQUIRE(handshake(0, level::bip35));
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, level::bip35);
+
+    // The channel is stopped, so the socket closes without a not_found.
+    BOOST_REQUIRE_THROW(receive(not_found::command), boost::system::system_error);
+}
+
+// The option is off by default, so the channel is stopped instead.
+BOOST_AUTO_TEST_CASE(functional_p2p__get_data__unknown_block_disabled__stopped)
+{
+    BOOST_REQUIRE(handshake());
+
+    const get_data get{ { { inventory_item::type_id::block, system::one_hash } } };
+    send(get, node_version->value);
+
+    BOOST_REQUIRE_THROW(receive(not_found::command), boost::system::system_error);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
