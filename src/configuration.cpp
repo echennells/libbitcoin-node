@@ -33,5 +33,10 @@ configuration::configuration(system::chain::selection context) NOEXCEPT
 {
 }
 
+void configuration::initialize() NOEXCEPT
+{
+    database.initialize(bitcoin);
+}
+
 } // namespace node
 } // namespace libbitcoin

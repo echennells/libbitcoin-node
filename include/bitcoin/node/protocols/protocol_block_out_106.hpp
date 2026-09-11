@@ -54,6 +54,8 @@ public:
 protected:
     using get_data = network::messages::peer::get_data;
     using get_blocks = network::messages::peer::get_blocks;
+    using inventory_item = network::messages::peer::inventory_item;
+    using inventory_items = network::messages::peer::inventory_items;
 
     /// Block announcements are superseded by send_headers.
     virtual bool superseded() const NOEXCEPT;
@@ -71,11 +73,17 @@ protected:
         const get_data::cptr& message) NOEXCEPT;
     virtual void send_block(const code& ec) NOEXCEPT;
 
+    /// The item cannot be served, stops the channel and returns false.
+    virtual bool handle_unservable(const inventory_item& item) NOEXCEPT;
+
+    /// Send any unservable items accumulated above, false if none.
+    virtual bool report_unservable() NOEXCEPT;
+
 private:
     using inventory = network::messages::peer::inventory;
-    using inventory_item = network::messages::peer::inventory_item;
-    using inventory_items = network::messages::peer::inventory_items;
 
+    bool is_servable(const inventory_item& item,
+        const database::header_link& link) NOEXCEPT;
     bool is_under_checkpoint(const database::header_link& link) NOEXCEPT;
     inventory create_inventory(const get_blocks& locator) const NOEXCEPT;
     void merge_inventory(const inventory_items& items) NOEXCEPT;
