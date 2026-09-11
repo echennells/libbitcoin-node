@@ -30,26 +30,40 @@ using namespace network;
 using namespace network::messages::peer;
 using namespace std::placeholders;
 
+// Shared pointers required for lifetime in handler parameters.
 BC_PUSH_WARNING(SMART_PTR_NOT_NEEDED)
 BC_PUSH_WARNING(NO_VALUE_OR_CONST_REF_SHARED_PTR)
 
 // Outbound (not_found).
 // ----------------------------------------------------------------------------
 
-// The item is answered and the send loop resumed, as with a block, so nothing
-// is produced until the prior write completes.
-void protocol_block_out_70001::handle_unservable(
+// Accumulate the run, so that it is reported by one message.
+bool protocol_block_out_70001::handle_unservable(
     const inventory_item& item) NOEXCEPT
 {
     BC_ASSERT(stranded());
 
     if (!enable_not_found_)
-    {
-        protocol_block_out_106::handle_unservable(item);
-        return;
-    }
+        return protocol_block_out_106::handle_unservable(item);
 
-    SEND(not_found{ { item } }, send_block, _1);
+    unservable_.push_back(item);
+    return true;
+}
+
+// The items are answered and the send loop resumed, as with a block, so
+// nothing is produced until the prior write completes.
+bool protocol_block_out_70001::report_unservable() NOEXCEPT
+{
+    BC_ASSERT(stranded());
+
+    if (unservable_.empty())
+        return false;
+
+    auto items = std::move(unservable_);
+    unservable_.clear();
+
+    SEND(not_found{ std::move(items) }, send_block, _1);
+    return true;
 }
 
 BC_POP_WARNING()

@@ -41,12 +41,18 @@ public:
     }
 
 protected:
-    /// The requested item cannot be served, replies not_found.
-    void handle_unservable(const inventory_item& item) NOEXCEPT override;
+    /// The item cannot be served, accumulates it for the not_found reply.
+    bool handle_unservable(const inventory_item& item) NOEXCEPT override;
+
+    /// Replies not_found with the accumulated items, false if none.
+    bool report_unservable() NOEXCEPT override;
 
 private:
     // This is thread safe.
     const bool enable_not_found_;
+
+    // This is protected by strand.
+    inventory_items unservable_{};
 };
 
 } // namespace node

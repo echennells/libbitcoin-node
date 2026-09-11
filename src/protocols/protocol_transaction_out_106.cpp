@@ -199,7 +199,7 @@ void protocol_transaction_out_106::send_transaction(const code& ec,
     const auto ptr = query.get_transaction(query.to_tx(item.hash), witness);
     if (!ptr)
     {
-        LOGR("Requested tx " << encode_hash(item.hash)
+        LOGV("Requested tx " << encode_hash(item.hash)
             << " from [" << opposite() << "] not found.");
 
         // This tx could not have been advertised to the peer.
@@ -211,10 +211,15 @@ void protocol_transaction_out_106::send_transaction(const code& ec,
 }
 
 // not_found is undefined below bip37, so the channel is stopped instead.
-void protocol_transaction_out_106::handle_unservable(const inventory_item&,
-    size_t, const get_data::cptr&) NOEXCEPT
+void protocol_transaction_out_106::handle_unservable(
+    const inventory_item& LOG_ONLY(item), size_t,
+    const get_data::cptr&) NOEXCEPT
 {
     BC_ASSERT(stranded());
+
+    LOGR("Unservable tx " << encode_hash(item.hash) << " from ["
+        << opposite() << "], stopping.");
+
     stop(system::error::not_found);
 }
 
