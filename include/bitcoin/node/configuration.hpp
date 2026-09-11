@@ -31,6 +31,9 @@ class BCN_API configuration
 public:
     configuration(system::chain::selection context) NOEXCEPT;
 
+    /// Pack derived settings, must follow configuration parse.
+    void initialize() NOEXCEPT;
+
     /// Settings.
     system::settings bitcoin;
     database::settings database;
