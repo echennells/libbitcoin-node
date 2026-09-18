@@ -96,12 +96,33 @@ jobs:
             echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Resolve dependency refs
+        id: refs
+        shell: bash
+        run: |
+          branch="${{ steps.get-branch.outputs.branch }}"
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-system" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-system=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-database" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-database=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-network" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-network=$ref" >> $GITHUB_OUTPUT
+
       - name: Checkout repository [libbitcoin-system]
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-system }}
           repository: ${{ github.repository_owner }}/libbitcoin-system
 
       - name: Checkout repository [libbitcoin-database]
@@ -109,7 +130,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-database'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-database }}
           repository: ${{ github.repository_owner }}/libbitcoin-database
 
       - name: Checkout repository [libbitcoin-network]
@@ -117,7 +138,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-network'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-network }}
           repository: ${{ github.repository_owner }}/libbitcoin-network
 
       - name: Checkout repository [libbitcoin-node]
@@ -330,12 +351,33 @@ jobs:
             echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Resolve dependency refs
+        id: refs
+        shell: bash
+        run: |
+          branch="${{ steps.get-branch.outputs.branch }}"
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-system" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-system=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-database" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-database=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-network" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-network=$ref" >> $GITHUB_OUTPUT
+
       - name: Checkout repository [libbitcoin-system]
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-system }}
           repository: ${{ github.repository_owner }}/libbitcoin-system
 
       - name: Checkout repository [libbitcoin-database]
@@ -343,7 +385,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-database'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-database }}
           repository: ${{ github.repository_owner }}/libbitcoin-database
 
       - name: Checkout repository [libbitcoin-network]
@@ -351,7 +393,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-network'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-network }}
           repository: ${{ github.repository_owner }}/libbitcoin-network
 
       - name: Checkout repository [libbitcoin-node]
@@ -527,12 +569,33 @@ jobs:
             echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Resolve dependency refs
+        id: refs
+        shell: bash
+        run: |
+          branch="${{ steps.get-branch.outputs.branch }}"
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-system" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-system=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-database" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-database=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-network" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-network=$ref" >> $GITHUB_OUTPUT
+
       - name: Checkout repository [libbitcoin-system]
         uses: actions/checkout@v6
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-system }}
           repository: ${{ github.repository_owner }}/libbitcoin-system
 
       - name: Checkout repository [libbitcoin-database]
@@ -540,7 +603,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-database'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-database }}
           repository: ${{ github.repository_owner }}/libbitcoin-database
 
       - name: Checkout repository [libbitcoin-network]
@@ -548,7 +611,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-network'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-network }}
           repository: ${{ github.repository_owner }}/libbitcoin-network
 
       - name: Checkout repository [libbitcoin-node]
@@ -706,6 +769,27 @@ jobs:
             echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Resolve dependency refs
+        id: refs
+        shell: bash
+        run: |
+          branch="${{ steps.get-branch.outputs.branch }}"
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-system" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-system=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-database" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-database=$ref" >> $GITHUB_OUTPUT
+          ref=""
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository_owner }}/libbitcoin-network" "$branch" > /dev/null 2>&1; then
+            ref="$branch"
+          fi
+          echo "libbitcoin-network=$ref" >> $GITHUB_OUTPUT
+
       - name: Set msbuild path
         uses: microsoft/setup-msbuild@v3
         with:
@@ -716,7 +800,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-system'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-system }}
           repository: ${{ github.repository_owner }}/libbitcoin-system
 
       - name: Checkout repository [libbitcoin-database]
@@ -724,7 +808,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-database'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-database }}
           repository: ${{ github.repository_owner }}/libbitcoin-database
 
       - name: Checkout repository [libbitcoin-network]
@@ -732,7 +816,7 @@ jobs:
         with:
           fetch-depth: 1
           path: 'libbitcoin-network'
-          ref: ${{ steps.get-branch.outputs.branch }}
+          ref: ${{ steps.refs.outputs.libbitcoin-network }}
           repository: ${{ github.repository_owner }}/libbitcoin-network
 
       - name: Checkout repository [libbitcoin-node]
