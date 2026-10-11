@@ -92,11 +92,17 @@ void chaser_transaction::do_bump() NOEXCEPT
 
     auto& query = archive();
     const auto top = query.get_top_confirmed();
+    const auto link = query.to_confirmed(top);
     const auto state = query.get_confirmed_chain_state(system_settings(),
-        query.to_confirmed(top), top);
+        link, top);
 
     if (!state)
     {
+        // A reorganization can pop the top while its state is read, and its
+        // subsequent organization bumps again.
+        if (link.is_terminal() || query.to_confirmed(top) != link)
+            return;
+
         fault(error::transaction1);
         return;
     }
