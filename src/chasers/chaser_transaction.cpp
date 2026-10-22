@@ -271,16 +271,49 @@ void chaser_transaction::do_submit(const transactions_cptr& txs, bool test,
         return;
     }
 
+    // A stored tx is a duplicate if any instance is confirmed, or pooled and
+    // confirmable (any without a pool table), otherwise it is validated and
+    // pooled (under its stored link if the witness matches). The same tx
+    // duplicates all of its points, so its unconfirmed instances are equally
+    // confirmable and one is walked.
     auto& query = archive();
-    std::vector<bool> stored(txs->size());
-    std::transform(txs->cbegin(), txs->cend(), stored.begin(),
-        [&](const auto& tx) NOEXCEPT
+    const auto is_confirmed = [&](const auto& link) NOEXCEPT
+    {
+        return query.is_confirmed_tx(link);
+    };
+
+    const auto is_pooled = [&](const auto& link) NOEXCEPT
+    {
+        return query.is_pooled(link);
+    };
+
+    std::vector<bool> duplicate(txs->size());
+    std::vector<database::tx_link> links(txs->size());
+    for (size_t index{}; index < txs->size(); ++index)
+    {
+        const auto& tx = *txs->at(index);
+        if (tx.is_coinbase())
+            continue;
+
+        const auto duplicates = query.to_duplicates(tx.get_hash(false));
+        if (duplicates.empty())
+            continue;
+
+        links.at(index) = to_stored(tx);
+        if (!query.pool_enabled() ||
+            std::ranges::any_of(duplicates, is_confirmed))
         {
-            return !tx->is_coinbase() && query.is_tx(tx->get_hash(false));
-        });
+            duplicate.at(index) = true;
+            continue;
+        }
+
+        const auto instance = std::ranges::find_if(duplicates, is_pooled);
+        duplicate.at(index) = instance != duplicates.cend() &&
+            query.is_confirmable_tx(*instance);
+    }
 
     size_t index{};
-    if (const auto ec = validate(index, *txs, stored))
+    if (const auto ec = validate(index, *txs, duplicate))
     {
         handler(ec, index);
         return;
@@ -296,18 +329,22 @@ void chaser_transaction::do_submit(const transactions_cptr& txs, bool test,
     const auto time = network::unix_time();
     for (index = zero; index < txs->size(); ++index)
     {
-        if (stored.at(index))
+        if (duplicate.at(index))
             continue;
 
-        bool pooled{};
-        database::tx_link link{};
         const auto& tx = *txs->at(index);
+        auto link = links.at(index);
+        const auto unstored = link.is_terminal();
+        auto pooled = !unstored && query.is_pooled(link);
 
         // Disk full may leave package partly archived, resolves by resubmit.
-        if (const auto ec = query.set_code(link, pooled, tx))
+        if (unstored)
         {
-            handler(fault(ec), index);
-            return;
+            if (const auto ec = query.set_code(link, pooled, tx))
+            {
+                handler(fault(ec), index);
+                return;
+            }
         }
 
         if (!pooled)
@@ -325,7 +362,9 @@ void chaser_transaction::do_submit(const transactions_cptr& txs, bool test,
             }
         }
 
-        fire(events::tx_archived, to_rate(tx));
+        if (unstored)
+            fire(events::tx_archived, to_rate(tx));
+
         notify(error::success, chases::transaction{ link });
     }
 
@@ -516,12 +555,12 @@ size_t chaser_transaction::to_rate(const chain::transaction& tx) NOEXCEPT
 // ----------------------------------------------------------------------------
 
 code chaser_transaction::validate(size_t& index, const transaction_cptrs& txs,
-    const std::vector<bool>& stored) NOEXCEPT
+    const std::vector<bool>& duplicate) NOEXCEPT
 {
     if (txs.empty())
         return error::empty_package;
 
-    if (std::ranges::all_of(stored, std::identity{}))
+    if (std::ranges::all_of(duplicate, std::identity{}))
         return error::duplicate_transaction;
 
     if (block::is_forward_reference(txs, false))
@@ -536,7 +575,7 @@ code chaser_transaction::validate(size_t& index, const transaction_cptrs& txs,
     uint64_t fee{}, size{};
     for (index = zero; index < txs.size(); ++index)
     {
-        if (stored.at(index))
+        if (duplicate.at(index))
             continue;
 
         const auto& tx = *txs.at(index);

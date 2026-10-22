@@ -80,7 +80,7 @@ private:
     static size_t to_rate(const system::chain::transaction& tx) NOEXCEPT;
 
     code validate(size_t& index, const system::chain::transaction_cptrs& txs,
-        const std::vector<bool>& stored) NOEXCEPT;
+        const std::vector<bool>& duplicate) NOEXCEPT;
     code validate(const system::chain::transaction& tx) NOEXCEPT;
     code validate(const system::chain::transaction& tx,
         const system::chain::context& ctx) NOEXCEPT;
