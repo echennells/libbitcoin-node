@@ -120,6 +120,111 @@ static bool stored_header(node::query& query) NOEXCEPT
     return query.set(parent()) && query.set(header1, context1, work1, false);
 }
 
+// The parent and a confirmed block (height one) spending its output.
+static bool stored_conflict(node::query& query) NOEXCEPT
+{
+    const system::settings bitcoin{ chain::selection::mainnet };
+    const auto& genesis = bitcoin.genesis_block.header();
+    const chain::input null{ chain::point{}, chain::script{}, max_uint32 };
+    const chain::transaction coinbase{ 1u, chain::inputs{ null },
+        chain::outputs{ { 42u, chain::script{} } }, 0u };
+    const chain::header header{ 1u, genesis.hash(), null_hash,
+        add1(genesis.timestamp()), genesis.bits(), 0u };
+    const chain::block block
+    {
+        header,
+        { coinbase, *spend(sub1(parent_value)) }
+    };
+    if ((!query.is_tx(parent().hash(false)) && !query.set(parent())) ||
+        !query.set(block, database::context{ 0, 1, 0 }, {}, false, true))
+        return false;
+
+    const auto link = query.to_header(block.hash());
+    return query.push_candidate(link) && query.push_confirmed(link, true);
+}
+
+// The parent, a spend of it, and a confirmed block (height one) with a
+// conflicting spend, which displaces the spend.
+static bool stored_displaced(node::query& query) NOEXCEPT
+{
+    const auto displaced = spend(parent_value);
+    return query.set(parent()) && query.set(*displaced) &&
+        stored_conflict(query);
+}
+
+// The parent and two instances of a spend of it.
+static bool stored_instances(node::query& query) NOEXCEPT
+{
+    const auto tx = spend(parent_value);
+    return query.set(parent()) && query.set(*tx) && query.set(*tx);
+}
+
+// The parent, two instances of a spend of it, and a confirmed block (height
+// one) with a conflicting spend, which displaces the spend.
+static bool stored_displaced_instances(node::query& query) NOEXCEPT
+{
+    const auto displaced = spend(parent_value);
+    return query.set(parent()) && query.set(*displaced) &&
+        query.set(*displaced) && stored_conflict(query);
+}
+
+// BIP352 send_and_receive_test_vectors.json: receiver keys.
+static constexpr ec_secret scan_secret = base16_array
+(
+    "0f694e068028a717f8af6b9411f9a133dd3565258714cc226594b34db90c1f2c"
+);
+static constexpr ec_secret spend_secret = base16_array
+(
+    "9d6ad855ce3417ef84e836892e5a56392bfba05fa5d97ccea30e266f540e08b3"
+);
+
+static system::scan::batch::receiver get_keys() NOEXCEPT
+{
+    ec_compressed spend{};
+    if (!secret_to_public(spend, spend_secret))
+        return {};
+
+    return wallet::silent_payment{ scan_secret, spend, {} }.keys();
+}
+
+// An unconfirmed tx with a pay-to-taproot output (the generator), spendable
+// with any witness in the pool context, as bip341 is not active (bip141 is).
+static const chain::transaction& taproot_parent() NOEXCEPT
+{
+    const chain::point point{ one_hash, 1u };
+    const chain::script taproot{ base16_chunk("512079be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"), false };
+    static const chain::transaction instance
+    {
+        1u,
+        chain::inputs{ { point, chain::script{}, max_uint32 } },
+        chain::outputs{ { parent_value, taproot } },
+        0u
+    };
+
+    return instance;
+}
+
+// A key path spend of the taproot parent paying the receiver keys (k = 0). The
+// signature is not verified, but an input without witness has no key [bip352].
+static chain::transaction::cptr silent_spend() NOEXCEPT
+{
+    const chain::point point{ taproot_parent().hash(false), 0u };
+    const chain::witness signature{ { to_chunk(ec_signature{}) } };
+    const chain::script payment{ base16_chunk("5120a0bc121bd89e6dee1a1aa978271bc868f691c4db37510618e8e0ecaefb71314e"), false };
+    return std::make_shared<const chain::transaction>(chain::transaction
+    {
+        1u,
+        chain::inputs{ { point, chain::script{}, signature, max_uint32 } },
+        chain::outputs{ { parent_value, payment } },
+        0u
+    });
+}
+
+static bool stored_taproot_parent(node::query& query) NOEXCEPT
+{
+    return query.set(taproot_parent());
+}
+
 BC_PUSH_WARNING(NO_THROW_IN_NOEXCEPT)
 
 struct chaser_transaction_setup_fixture
@@ -331,6 +436,88 @@ struct chaser_transaction_header_setup_fixture
     }
 };
 
+struct chaser_transaction_conflict_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_conflict_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+        }, stored_conflict)
+    {
+    }
+};
+
+struct chaser_transaction_displaced_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_displaced_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+        }, stored_displaced)
+    {
+    }
+};
+
+struct chaser_transaction_instances_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_instances_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+        }, stored_instances)
+    {
+    }
+};
+
+struct chaser_transaction_displaced_instances_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_displaced_instances_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+        }, stored_displaced_instances)
+    {
+    }
+};
+
+struct chaser_transaction_pool_disabled_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_pool_disabled_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+            config.database.pool.buckets = 0;
+        })
+    {
+    }
+};
+
+struct chaser_transaction_silent_setup_fixture
+  : chaser_transaction_setup_fixture
+{
+    inline chaser_transaction_silent_setup_fixture()
+      : chaser_transaction_setup_fixture([](configuration& config)
+        {
+            config.network.enable_relay = true;
+            config.node.currency_window_minutes = 0;
+            config.node.silent_start_height = 0;
+            const auto genesis = config.bitcoin.genesis_block.hash();
+            config.bitcoin.bip9_bit1_active_checkpoint = { genesis, 0 };
+        }, stored_taproot_parent)
+    {
+    }
+};
+
 struct chaser_transaction_memory_pool_setup_fixture
   : chaser_transaction_setup_fixture
 {
@@ -384,10 +571,10 @@ BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__empty__empty_package, chaser
     BOOST_REQUIRE_EQUAL(result.first, node::error::empty_package);
 }
 
-BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored__duplicate_transaction, chaser_transaction_pooling_setup_fixture)
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_parent__missing_previous_output, chaser_transaction_pooling_setup_fixture)
 {
     const auto result = submit(package({ std::make_shared<const chain::transaction>(parent()) }));
-    BOOST_REQUIRE_EQUAL(result.first, node::error::duplicate_transaction);
+    BOOST_REQUIRE_EQUAL(result.first, system::error::missing_previous_output);
 }
 
 BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__forward_reference__forward_reference, chaser_transaction_pooling_setup_fixture)
@@ -491,6 +678,142 @@ BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_parent_and_child__suc
     BOOST_REQUIRE_EQUAL(submit(package({ first })).first, node::error::success);
     BOOST_REQUIRE_EQUAL(submit(package({ first, second })).first, node::error::success);
     BOOST_REQUIRE(query_.is_tx(second->hash(false)));
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_unpooled_tx__pooled, chaser_transaction_pooling_setup_fixture)
+{
+    const auto tx = spend(parent_value);
+    BOOST_REQUIRE(query_.set(*tx));
+
+    const auto stored = query_.to_tx(tx->hash(false));
+    BOOST_REQUIRE(!query_.is_pooled(stored));
+    BOOST_REQUIRE_EQUAL(submit(package({ tx })).first, node::error::success);
+    BOOST_REQUIRE(query_.is_pooled(stored));
+    BOOST_REQUIRE_EQUAL(query_.to_tx(tx->hash(false)), stored);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_unpooled_tx__notified, chaser_transaction_pooling_setup_fixture)
+{
+    subscribe();
+    const auto tx = spend(parent_value);
+    BOOST_REQUIRE(query_.set(*tx));
+    BOOST_REQUIRE_EQUAL(submit(package({ tx })).first, node::error::success);
+
+    chases::transaction transaction{};
+    BOOST_REQUIRE(await(transaction));
+    BOOST_REQUIRE_EQUAL(transaction.link, query_.to_tx(tx->hash(false)));
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_unpooled_tx__silent_indexed, chaser_transaction_silent_setup_fixture)
+{
+    const auto tx = silent_spend();
+    BOOST_REQUIRE(query_.set(*tx));
+    BOOST_REQUIRE_EQUAL(submit(package({ tx })).first, node::error::success);
+
+    database::silent_matches out{};
+    const stopper cancel{};
+    const auto last = query_.get_silent_frontier(zero);
+    BOOST_REQUIRE(query_.get_silent_matches(out, cancel, get_keys(), zero, last, zero, zero, false));
+    BOOST_REQUIRE_EQUAL(out.size(), one);
+    BOOST_REQUIRE_EQUAL(std::get<0>(out.front()), zero);
+    BOOST_REQUIRE_EQUAL(std::get<1>(out.front()), tx->hash(false));
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_pool_conflict__double_spend, chaser_transaction_pooling_setup_fixture)
+{
+    BOOST_REQUIRE_EQUAL(submit(package({ spend(parent_value) })).first, node::error::success);
+    const auto conflict = spend(sub1(parent_value));
+    BOOST_REQUIRE(query_.set(*conflict));
+
+    BOOST_REQUIRE_EQUAL(submit(package({ conflict })).first, system::error::double_spend);
+    BOOST_REQUIRE(!query_.is_pooled(query_.to_tx(conflict->hash(false))));
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_confirmed_conflict__confirmed_double_spend, chaser_transaction_conflict_setup_fixture)
+{
+    const auto conflicted = spend(parent_value);
+    BOOST_REQUIRE(query_.set(*conflicted));
+
+    BOOST_REQUIRE_EQUAL(submit(package({ conflicted })).first, system::error::confirmed_double_spend);
+    BOOST_REQUIRE(!query_.is_pooled(query_.to_tx(conflicted->hash(false))));
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__confirmed__duplicate_transaction, chaser_transaction_conflict_setup_fixture)
+{
+    const auto result = submit(package({ spend(sub1(parent_value)) }));
+    BOOST_REQUIRE_EQUAL(result.first, node::error::duplicate_transaction);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__displaced_pooled_tx__confirmed_double_spend, chaser_transaction_displaced_setup_fixture)
+{
+    // Pooled after startup, as a startup prune drops an unconfirmable tx.
+    const auto displaced = spend(parent_value);
+    const auto link = query_.to_tx(displaced->hash(false));
+    BOOST_REQUIRE(query_.set_pooled(link, *displaced, database::context{ 0, 1, 0 }, 0));
+    BOOST_REQUIRE(query_.is_pooled(link));
+    BOOST_REQUIRE(!query_.is_confirmable_tx(link));
+
+    const auto result = submit(package({ displaced }));
+    BOOST_REQUIRE_EQUAL(result.first, system::error::confirmed_double_spend);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_instances_one_pooled__duplicate_transaction, chaser_transaction_instances_setup_fixture)
+{
+    const auto tx = spend(parent_value);
+    const auto instances = query_.to_duplicates(tx->hash(false));
+    BOOST_REQUIRE_EQUAL(instances.size(), two);
+    BOOST_REQUIRE(query_.set_pooled(instances.back(), *tx, database::context{ 0, 1, 0 }, 0));
+    BOOST_REQUIRE(!query_.is_pooled(instances.front()));
+
+    const auto result = submit(package({ tx }));
+    BOOST_REQUIRE_EQUAL(result.first, node::error::duplicate_transaction);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__displaced_instances_one_pooled__confirmed_double_spend, chaser_transaction_displaced_instances_setup_fixture)
+{
+    const auto displaced = spend(parent_value);
+    const auto instances = query_.to_duplicates(displaced->hash(false));
+    BOOST_REQUIRE_EQUAL(instances.size(), two);
+    BOOST_REQUIRE(query_.set_pooled(instances.back(), *displaced, database::context{ 0, 1, 0 }, 0));
+    BOOST_REQUIRE(!query_.is_confirmable_tx(instances.back()));
+
+    const auto result = submit(package({ displaced }));
+    BOOST_REQUIRE_EQUAL(result.first, system::error::confirmed_double_spend);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__stored_unpooled_parent_and_child__pooled, chaser_transaction_pooling_setup_fixture)
+{
+    const auto first = spend(parent_value);
+    const auto second = spend(first->hash(false), parent_value);
+    BOOST_REQUIRE(query_.set(*first));
+
+    const auto stored = query_.to_tx(first->hash(false));
+    BOOST_REQUIRE(!query_.is_pooled(stored));
+
+    BOOST_REQUIRE_EQUAL(submit(package({ first, second })).first, node::error::success);
+    BOOST_REQUIRE(query_.is_pooled(stored));
+    BOOST_REQUIRE(query_.is_pooled(query_.to_tx(second->hash(false))));
+    BOOST_REQUIRE_EQUAL(query_.to_tx(first->hash(false)), stored);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__pooled_displaced_descendants__missing_previous_output, chaser_transaction_displaced_setup_fixture)
+{
+    const auto first = spend(spend(parent_value)->hash(false), parent_value);
+    const auto second = spend(first->hash(false), parent_value);
+    BOOST_REQUIRE(query_.set(*first));
+    BOOST_REQUIRE(query_.set(*second));
+    BOOST_REQUIRE(query_.set_pooled(query_.to_tx(first->hash(false)), *first, database::context{ 0, 1, 0 }, 0));
+    BOOST_REQUIRE(query_.set_pooled(query_.to_tx(second->hash(false)), *second, database::context{ 0, 1, 0 }, 0));
+
+    const auto result = submit(package({ first, second }));
+    BOOST_REQUIRE_EQUAL(result.first, system::error::missing_previous_output);
+}
+
+BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__pool_disabled_stored__duplicate_transaction, chaser_transaction_pool_disabled_setup_fixture)
+{
+    const auto tx = spend(parent_value);
+    BOOST_REQUIRE(query_.set(*tx));
+    BOOST_REQUIRE_EQUAL(submit(package({ tx })).first, node::error::duplicate_transaction);
 }
 
 BOOST_FIXTURE_TEST_CASE(chaser_transaction__submit__zero_fee_minimum_rate__insufficient_fee, chaser_transaction_fee_setup_fixture)
