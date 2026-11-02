@@ -67,7 +67,10 @@ void chaser_validate::validate_block(const header_link& link,
     {
         ec = error::validate3;
     }
-    else if (current && ((ec = validate_pooled(pooled, link, ctx))))
+    // The pooled path does not materialize the block, so it cannot verify the
+    // signet solution; signet blocks take the full validation path.
+    else if (current && !ctx.is_enabled(chain::flags::signet_rule) &&
+        ((ec = validate_pooled(pooled, link, ctx))))
     {
         if (!node::error::error_category::contains(ec) &&
             !query.set_block_unconfirmable(link))
